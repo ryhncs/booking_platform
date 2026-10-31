@@ -112,6 +112,22 @@ CELERY_TASK_TIME_LIMIT = 60
 CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULE = {}  # periodic tasks are registered next to the tasks themselves
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"{REDIS_URL}/1",
+        "KEY_PREFIX": "booking",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # A cache outage must slow requests down, never fail them.
+            "SOCKET_CONNECT_TIMEOUT": 1,
+            "SOCKET_TIMEOUT": 1,
+        },
+    }
+}
+DJANGO_REDIS_IGNORE_EXCEPTIONS = True
+DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+
 # --- Email -------------------------------------------------------------------
 EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", default="localhost")

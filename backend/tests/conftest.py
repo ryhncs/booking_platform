@@ -3,6 +3,7 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -18,6 +19,14 @@ def next_monday_at(hour: int, minute: int = 0) -> datetime:
     days_ahead = (0 - today.weekday()) % 7 or 7
     day = today + timedelta(days=days_ahead)
     return datetime.combine(day, time(hour, minute), tzinfo=TEHRAN)
+
+
+@pytest.fixture(autouse=True)
+def _clean_cache():
+    """Every test starts with an empty cache (Redis db 2, see settings.test)."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture
