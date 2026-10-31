@@ -6,6 +6,13 @@ from apps.businesses.models import Service, Staff
 from .models import Booking
 
 
+class ErrorSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+    code = serializers.CharField(
+        required=False, help_text="Machine-readable, e.g. slot_unavailable."
+    )
+
+
 class AvailabilityQuerySerializer(serializers.Serializer):
     staff = serializers.IntegerField(min_value=1)
     service = serializers.IntegerField(min_value=1)

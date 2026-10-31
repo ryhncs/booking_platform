@@ -6,5 +6,6 @@ docker compose run --rm --build web sh -c '
   ruff check . &&
   ruff format --check . &&
   python manage.py makemigrations --check --dry-run &&
+  python manage.py spectacular --validate --fail-on-warn --file /dev/null &&
   pytest --cov=apps -q '"$*"'
 '

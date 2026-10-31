@@ -27,13 +27,14 @@ Before saying a change is done, run all of the above and make sure they pass. Ne
 PyPI is unreachable from the dev network; the repo-root `.env` sets `PIP_INDEX_URL` to a mirror. After changing requirements, rebuild with `docker compose up --build`.
 
 ## Commands (from `backend/`, inside the container)
+- `./check.sh` (from repo root) — all CI checks in Docker, incl. `spectacular --validate --fail-on-warn`
 - `docker compose up --build` (from repo root) — db, redis, web on :8000
 - `pytest --cov=apps` — needs Postgres reachable via `DATABASE_URL`
 - `ruff check . && ruff format --check .` — CI runs both plus `makemigrations --check`
 
 ## Roadmap
 - [x] Stage 1: models, constraint, service layer, tests, Docker, CI
-- [ ] Stage 2: REST API — JWT (simplejwt), role-based permissions, business/staff/service CRUD for owners, availability endpoint (free slots for a staff+service+date), booking create/confirm/cancel, drf-spectacular Swagger at /api/docs/, API tests
+- [x] Stage 2: REST API — JWT (simplejwt), role-based permissions, business/staff/service CRUD for owners, availability endpoint (free slots for a staff+service+date), booking create/confirm/cancel, drf-spectacular Swagger at /api/docs/, API tests
 - [ ] Stage 3: Redis cache for availability with invalidation on booking change; Celery + Beat: confirmation email, 24h reminder, release expired pending holds
 - [ ] Stage 4: `frontend/` React + Redux Toolkit (RTK Query)
 - [ ] Stage 5: deploy, architecture diagram, query benchmarks in README

@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -17,8 +18,10 @@ from .availability import free_slots
 from .models import Booking
 from .serializers import (
     AvailabilityQuerySerializer,
+    AvailabilitySerializer,
     BookingCreateSerializer,
     BookingSerializer,
+    ErrorSerializer,
 )
 
 MAX_DAYS_AHEAD = 180
@@ -27,6 +30,11 @@ MAX_DAYS_AHEAD = 180
 class AvailabilityView(APIView):
     """Free slots for one staff member and service on one local date."""
 
+    @extend_schema(
+        summary="Free slots for a staff member and service on a date",
+        parameters=[AvailabilityQuerySerializer],
+        responses={200: AvailabilitySerializer, 400: ErrorSerializer, 404: ErrorSerializer},
+    )
     def get(self, request):
         query = AvailabilityQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
@@ -59,6 +67,25 @@ class AvailabilityView(APIView):
         return Response(body)
 
 
+@extend_schema_view(
+    list=extend_schema(summary="List my bookings (or those at businesses I own)"),
+    retrieve=extend_schema(summary="Get one booking"),
+    create=extend_schema(
+        summary="Request a booking (starts as a 10-minute pending hold)",
+        request=BookingCreateSerializer,
+        responses={201: BookingSerializer, 400: ErrorSerializer, 409: ErrorSerializer},
+    ),
+    confirm=extend_schema(
+        summary="Confirm a pending booking",
+        request=None,
+        responses={200: BookingSerializer, 400: ErrorSerializer},
+    ),
+    cancel=extend_schema(
+        summary="Cancel a pending or confirmed booking",
+        request=None,
+        responses={200: BookingSerializer, 400: ErrorSerializer},
+    ),
+)
 class BookingViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -75,6 +102,8 @@ class BookingViewSet(
     serializer_class = BookingSerializer
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):  # schema generation, no user
+            return Booking.objects.none()
         user = self.request.user
         qs = Booking.objects.select_related("staff__business", "service").filter(
             Q(customer=user) | Q(staff__business__owner=user)

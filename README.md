@@ -51,6 +51,19 @@ Booking: customer, staff, service, [start, end), status, expires_at
 
 Unconfirmed bookings carry an `expires_at` hold (10 minutes) so abandoned checkouts do not block a slot forever; a partial index on pending bookings keeps the expiry sweep cheap.
 
+## API
+
+Interactive docs (Swagger UI) at `/api/docs/`, OpenAPI schema at `/api/schema/`. Auth is JWT: `POST /api/auth/login/` with `{email, password}`, then send `Authorization: Bearer <access>`.
+
+| Endpoint | Who | Notes |
+| --- | --- | --- |
+| `POST /api/auth/register/`, `/login/`, `/refresh/`; `GET/PATCH /api/me/` | anyone / signed-in | self-registration as `customer` or `owner` only |
+| `/api/businesses/`, `/staff/`, `/services/`, `/working-hours/` | read: any signed-in user; write: owners | writes are scoped to the owner's own data (others' objects 404) |
+| `GET /api/availability/?staff=&service=&date=` | signed-in | free slots in 15-minute steps, in the business's local time |
+| `POST /api/bookings/`, `GET /api/bookings/`, `POST /api/bookings/{id}/confirm/` and `/cancel/` | customer, or owner of the business | all writes go through `services.py` |
+
+Booking errors are mapped in one place: a lost race for a slot is **409** (`slot_unavailable`); other rule violations (outside working hours, past start, expired hold) are **400** with a machine-readable `code`.
+
 ## Running locally
 
 ```bash
@@ -65,14 +78,16 @@ Run the tests (PostgreSQL is required; SQLite cannot express range exclusion con
 docker compose exec web pytest --cov=apps
 ```
 
+Or run everything CI runs (lint, format, migrations check, OpenAPI validation, tests) in a throwaway container with `./check.sh`.
+
 ## Tech stack
 
-Django 5.2 · DRF · PostgreSQL 16 (`btree_gist`, range types) · Redis · Docker Compose · pytest · GitHub Actions · Ruff
+Django 5.2 · DRF · simplejwt · drf-spectacular · PostgreSQL 16 (`btree_gist`, range types) · Redis · Docker Compose · pytest · GitHub Actions · Ruff
 
 ## Roadmap
 
 - [x] **Stage 1:** data model, overlap constraint, booking service, concurrency tests, Docker, CI
-- [ ] **Stage 2:** REST API (JWT auth, role-based permissions, availability endpoint), OpenAPI docs via drf-spectacular
+- [x] **Stage 2:** REST API (JWT auth, role-based permissions, availability endpoint), OpenAPI docs via drf-spectacular
 - [ ] **Stage 3:** Redis caching of available slots with invalidation; Celery for confirmation emails, reminders and releasing expired holds
 - [ ] **Stage 4:** React + Redux Toolkit frontend
 - [ ] **Stage 5:** deployment, architecture diagram, query-performance benchmarks
