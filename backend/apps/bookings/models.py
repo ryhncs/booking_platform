@@ -39,6 +39,12 @@ class Booking(models.Model):
         related_name="cancelled_bookings",
     )
     cancellation_reason = models.TextField(blank=True)
+    # Set when the corresponding email has been claimed for sending. They make
+    # the notification tasks idempotent: a duplicate delivery finds the
+    # timestamp already set and does nothing.
+    confirmation_email_sent_at = models.DateTimeField(null=True, blank=True)
+    cancellation_email_sent_at = models.DateTimeField(null=True, blank=True)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -47,6 +53,12 @@ class Booking(models.Model):
         indexes = [
             models.Index(fields=["staff", "start"], name="booking_staff_start_idx"),
             models.Index(fields=["customer", "-start"], name="booking_customer_start_idx"),
+            # Keeps the 24h-reminder sweep cheap: only unreminded confirmed bookings.
+            models.Index(
+                fields=["start"],
+                name="booking_reminder_due_idx",
+                condition=Q(status="confirmed", reminder_sent_at__isnull=True),
+            ),
             models.Index(
                 fields=["expires_at"],
                 name="booking_pending_expiry_idx",

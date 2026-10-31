@@ -110,7 +110,16 @@ CELERY_BROKER_URL = f"{REDIS_URL}/0"
 CELERY_TASK_ACKS_LATE = True  # a task lost to a worker crash is redelivered
 CELERY_TASK_TIME_LIMIT = 60
 CELERY_TIMEZONE = "UTC"
-CELERY_BEAT_SCHEDULE = {}  # periodic tasks are registered next to the tasks themselves
+CELERY_BEAT_SCHEDULE = {
+    "release-expired-holds": {
+        "task": "apps.bookings.tasks.release_expired_holds",
+        "schedule": 60.0,
+    },
+    "send-due-reminders": {
+        "task": "apps.bookings.tasks.send_due_reminders",
+        "schedule": 15 * 60.0,
+    },
+}
 
 CACHES = {
     "default": {

@@ -111,6 +111,23 @@ def create_booking(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+HOLD_EXPIRED_REASON = "The reservation hold expired before the booking was confirmed."
+
+
+def _enqueue_after_commit(task_name: str, booking_id: int) -> None:
+    """Queue a notification task once the surrounding transaction commits.
+
+    Queuing earlier could run the task before the row exists or is visible, or
+    send an email for a change that is then rolled back. ``robust=True`` means a
+    broker outage is logged instead of turning an already-committed booking
+    into a 500.
+    """
+    from . import tasks  # tasks calls back into this module, so resolve lazily
+
+    task = getattr(tasks, task_name)
+    transaction.on_commit(lambda: task.delay(booking_id), robust=True)
+
+
 def confirm_booking(booking: Booking) -> Booking:
     with transaction.atomic():
         booking = Booking.objects.select_for_update().get(pk=booking.pk)
@@ -121,7 +138,20 @@ def confirm_booking(booking: Booking) -> Booking:
         booking.status = Booking.Status.CONFIRMED
         booking.expires_at = None
         booking.save(update_fields=["status", "expires_at", "updated_at"])
+        _enqueue_after_commit("send_confirmation_email", booking.pk)
     return booking
+
+
+def _mark_cancelled(booking: Booking, *, cancelled_by, reason: str) -> None:
+    """Cancel a row the caller has already locked and validated."""
+    booking.status = Booking.Status.CANCELLED
+    booking.expires_at = None
+    booking.cancelled_by = cancelled_by
+    booking.cancellation_reason = reason
+    booking.save(
+        update_fields=["status", "expires_at", "cancelled_by", "cancellation_reason", "updated_at"]
+    )
+    _enqueue_after_commit("send_cancellation_email", booking.pk)
 
 
 def cancel_booking(booking: Booking, *, cancelled_by, reason: str = "") -> Booking:
@@ -129,17 +159,24 @@ def cancel_booking(booking: Booking, *, cancelled_by, reason: str = "") -> Booki
         booking = Booking.objects.select_for_update().get(pk=booking.pk)
         if booking.status not in (Booking.Status.PENDING, Booking.Status.CONFIRMED):
             raise InvalidBookingRequest(f"cannot cancel a {booking.status} booking")
-        booking.status = Booking.Status.CANCELLED
-        booking.expires_at = None
-        booking.cancelled_by = cancelled_by
-        booking.cancellation_reason = reason
-        booking.save(
-            update_fields=[
-                "status",
-                "expires_at",
-                "cancelled_by",
-                "cancellation_reason",
-                "updated_at",
-            ]
-        )
+        _mark_cancelled(booking, cancelled_by=cancelled_by, reason=reason)
     return booking
+
+
+def expire_booking(booking_id: int) -> bool:
+    """Cancel a pending booking whose hold has lapsed; return whether it did.
+
+    The status and expiry are re-checked under a row lock, so a booking that
+    was confirmed or cancelled after the sweep selected it is left alone.
+    """
+    with transaction.atomic():
+        booking = Booking.objects.select_for_update().filter(pk=booking_id).first()
+        if (
+            booking is None
+            or booking.status != Booking.Status.PENDING
+            or booking.expires_at is None
+            or booking.expires_at > timezone.now()
+        ):
+            return False
+        _mark_cancelled(booking, cancelled_by=None, reason=HOLD_EXPIRED_REASON)
+    return True
