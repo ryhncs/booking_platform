@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 REMINDER_WINDOW = timedelta(hours=24)
 SWEEP_BATCH = 500
+# Lost-email sweep: give the original task this long to run before assuming it
+# was lost, and stop trying after RESEND_MAX_AGE. The cap also keeps the sweep
+# from emailing about old bookings that predate the *_sent_at columns.
+RESEND_AFTER = timedelta(minutes=2)
+RESEND_MAX_AGE = timedelta(hours=24)
 
 email_task = shared_task(
     bind=True,
@@ -123,3 +128,49 @@ def release_expired_holds() -> int:
     if released:
         logger.info("Released %d expired booking hold(s)", released)
     return released
+
+
+@shared_task
+def resend_unsent_emails() -> int:
+    """Re-queue confirmation/cancellation emails that never went out.
+
+    Those emails are queued with ``on_commit(robust=True)``, so if the broker
+    is down at that instant the booking succeeds and the enqueue is only
+    logged. This sweep is the safety net: a confirmed/cancelled booking whose
+    ``*_sent_at`` is still NULL more than ``RESEND_AFTER`` after its last
+    status change gets its task queued again. Re-queuing is always safe: the
+    tasks claim each send atomically, so a duplicate or a race with the
+    original task sends nothing extra. Bookings already in the past are skipped.
+    """
+    now = timezone.now()
+    changed_between = {
+        "updated_at__lte": now - RESEND_AFTER,
+        "updated_at__gte": now - RESEND_MAX_AGE,
+        "start__gt": now,
+    }
+    unsent = [
+        (
+            send_confirmation_email,
+            Booking.objects.filter(
+                status=Booking.Status.CONFIRMED,
+                confirmation_email_sent_at__isnull=True,
+                **changed_between,
+            ),
+        ),
+        (
+            send_cancellation_email,
+            Booking.objects.filter(
+                status=Booking.Status.CANCELLED,
+                cancellation_email_sent_at__isnull=True,
+                **changed_between,
+            ),
+        ),
+    ]
+    requeued = 0
+    for task, queryset in unsent:
+        for booking_id in queryset.values_list("pk", flat=True)[:SWEEP_BATCH]:
+            task.delay(booking_id)
+            requeued += 1
+    if requeued:
+        logger.warning("Re-queued %d booking email(s) that had not been sent", requeued)
+    return requeued

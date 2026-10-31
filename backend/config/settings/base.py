@@ -115,6 +115,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.bookings.tasks.release_expired_holds",
         "schedule": 60.0,
     },
+    "resend-unsent-emails": {
+        "task": "apps.bookings.tasks.resend_unsent_emails",
+        "schedule": 5 * 60.0,
+    },
     "send-due-reminders": {
         "task": "apps.bookings.tasks.send_due_reminders",
         "schedule": 15 * 60.0,

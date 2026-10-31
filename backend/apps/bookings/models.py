@@ -59,6 +59,17 @@ class Booking(models.Model):
                 name="booking_reminder_due_idx",
                 condition=Q(status="confirmed", reminder_sent_at__isnull=True),
             ),
+            # Keep the lost-email sweep cheap: only bookings still owed an email.
+            models.Index(
+                fields=["updated_at"],
+                name="booking_confirm_unsent_idx",
+                condition=Q(status="confirmed", confirmation_email_sent_at__isnull=True),
+            ),
+            models.Index(
+                fields=["updated_at"],
+                name="booking_cancel_unsent_idx",
+                condition=Q(status="cancelled", cancellation_email_sent_at__isnull=True),
+            ),
             models.Index(
                 fields=["expires_at"],
                 name="booking_pending_expiry_idx",

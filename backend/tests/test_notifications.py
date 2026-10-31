@@ -280,6 +280,119 @@ class TestFailureHandling:
         assert booking.status == Booking.Status.CONFIRMED
 
 
+class TestResendUnsentEmails:
+    """The safety net for an email whose enqueue was lost (broker down at commit)."""
+
+    def age(self, booking, **delta):
+        """Pretend the last status change happened `delta` ago."""
+        Booking.objects.filter(pk=booking.pk).update(updated_at=timezone.now() - timedelta(**delta))
+
+    def confirm_losing_the_email(self, booking):
+        with mock.patch.object(
+            tasks.send_confirmation_email, "delay", side_effect=OSError("broker down")
+        ):
+            confirm_booking(booking)
+        assert mail.outbox == []
+
+    def cancel_losing_the_email(self, booking, **kwargs):
+        with mock.patch.object(
+            tasks.send_cancellation_email, "delay", side_effect=OSError("broker down")
+        ):
+            cancel_booking(booking, **kwargs)
+        assert mail.outbox == []
+
+    def test_lost_confirmation_is_eventually_sent(self, booking, customer):
+        self.confirm_losing_the_email(booking)
+        self.age(booking, minutes=3)
+
+        assert tasks.resend_unsent_emails() == 1
+
+        assert [m.to for m in mail.outbox] == [[customer.email]]
+        assert "confirmed" in mail.outbox[0].subject.lower()
+        booking.refresh_from_db()
+        assert booking.confirmation_email_sent_at is not None
+
+    def test_lost_cancellation_is_eventually_sent_with_who_and_why(self, booking, customer, owner):
+        self.cancel_losing_the_email(booking, cancelled_by=customer, reason="Changed my mind")
+        self.age(booking, minutes=3)
+
+        assert tasks.resend_unsent_emails() == 1
+
+        assert [m.to for m in mail.outbox] == [[owner.email]]
+        assert "Cancelled by: the customer" in mail.outbox[0].body
+        assert "Changed my mind" in mail.outbox[0].body
+
+    def test_waits_for_the_original_task_before_assuming_it_was_lost(self, booking):
+        self.confirm_losing_the_email(booking)
+        self.age(booking, minutes=1)  # inside the 2 minute grace period
+        assert tasks.resend_unsent_emails() == 0
+        assert mail.outbox == []
+
+    def test_does_not_touch_emails_that_were_already_sent(self, booking):
+        confirm_booking(booking)  # normal path: sent immediately
+        assert len(mail.outbox) == 1
+        self.age(booking, minutes=10)
+        assert tasks.resend_unsent_emails() == 0
+        assert len(mail.outbox) == 1
+
+    def test_sweep_is_idempotent(self, booking):
+        self.confirm_losing_the_email(booking)
+        self.age(booking, minutes=3)
+        assert tasks.resend_unsent_emails() == 1
+        assert tasks.resend_unsent_emails() == 0
+        assert len(mail.outbox) == 1
+
+    def test_a_late_original_task_does_not_double_send(self, booking):
+        """The sweep and the (slow, not lost) original task both run: one email."""
+        self.confirm_losing_the_email(booking)
+        self.age(booking, minutes=3)
+        tasks.resend_unsent_emails()
+        assert tasks.send_confirmation_email.delay(booking.pk).get() == "duplicate"
+        assert len(mail.outbox) == 1
+
+    def test_cancelled_after_a_lost_confirmation_only_sends_the_cancellation(
+        self, booking, customer
+    ):
+        self.confirm_losing_the_email(booking)
+        self.cancel_losing_the_email(booking, cancelled_by=customer)
+        self.age(booking, minutes=3)
+
+        assert tasks.resend_unsent_emails() == 1  # not a stale "confirmed" email as well
+
+        assert len(mail.outbox) == 1
+        assert "cancelled" in mail.outbox[0].subject.lower()
+
+    def test_gives_up_after_the_max_age(self, booking):
+        self.confirm_losing_the_email(booking)
+        self.age(booking, hours=25)
+        assert tasks.resend_unsent_emails() == 0
+        assert mail.outbox == []
+
+    def test_skips_bookings_that_are_already_in_the_past(self, customer, staff, service):
+        past = make_booking(
+            customer,
+            staff,
+            service,
+            status=Booking.Status.CONFIRMED,
+            start=timezone.now() - timedelta(hours=3),
+        )
+        self.age(past, minutes=10)
+        assert tasks.resend_unsent_emails() == 0
+        assert mail.outbox == []
+
+    def test_pending_bookings_are_not_emailed(self, booking):
+        self.age(booking, minutes=10)
+        assert tasks.resend_unsent_emails() == 0
+        assert mail.outbox == []
+
+    def test_runs_every_five_minutes(self):
+        from config import celery_app
+
+        entry = celery_app.conf.beat_schedule["resend-unsent-emails"]
+        assert entry["task"] == "apps.bookings.tasks.resend_unsent_emails"
+        assert entry["schedule"] == 300
+
+
 def test_beat_schedule_points_at_real_tasks():
     from celery import current_app
 

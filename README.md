@@ -76,8 +76,9 @@ Booking errors are mapped in one place: a lost race for a slot is **409** (`slot
 | `send_cancellation_email` | booking cancelled | says who cancelled and why; goes to the party who did *not* cancel |
 | `send_due_reminders` → `send_reminder_email` | every 15 min | confirmed bookings starting within 24h |
 | `release_expired_holds` | every minute | cancels lapsed pending holds via `services.expire_booking`, which re-checks under a row lock so it can't cancel a booking confirmed meanwhile |
+| `resend_unsent_emails` | every 5 min | safety net: re-queues confirmation/cancellation emails still unsent 2+ min after the status change (e.g. broker was down at commit); skips past bookings and gives up after 24h |
 
-Email tasks are idempotent: each *claims* its send with an atomic `UPDATE … WHERE <sent_at> IS NULL` (`confirmation_email_sent_at`, `cancellation_email_sent_at`, `reminder_sent_at`), so duplicate deliveries and concurrent workers send once; a failed send releases the claim and is retried with backoff.
+Email tasks are idempotent: each *claims* its send with an atomic `UPDATE … WHERE <sent_at> IS NULL` (`confirmation_email_sent_at`, `cancellation_email_sent_at`, `reminder_sent_at`), so duplicate deliveries and concurrent workers send once; a failed send releases the claim and is retried with backoff. That same claim is what makes the sweep safe: re-queuing can never double-send.
 
 ## Running locally
 
