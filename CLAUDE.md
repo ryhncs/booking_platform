@@ -16,7 +16,17 @@ Portfolio project: multi-business appointment booking backend (Django 5.2, DRF, 
 - Timestamps stored in UTC; working hours are local to `Business.timezone`.
 - PostgreSQL only (SQLite can't express the constraint).
 
-## Commands (from `backend/`)
+## Running things — always inside Docker
+The dev machine is Windows with no local Python deps. The stack runs via `docker compose up` from the repo root, and every Python command goes through the `web` container (it mounts `./backend` at `/app`, so edits are picked up live):
+- `docker compose exec web pytest`
+- `docker compose exec web ruff check . --fix` then `docker compose exec web ruff format .`
+- `docker compose exec web python manage.py makemigrations` (never hand-write migrations; generate them, then run `makemigrations --check --dry-run`)
+
+Before saying a change is done, run all of the above and make sure they pass. Never report a change as tested if only a syntax check ran.
+
+PyPI is unreachable from the dev network; the repo-root `.env` sets `PIP_INDEX_URL` to a mirror. After changing requirements, rebuild with `docker compose up --build`.
+
+## Commands (from `backend/`, inside the container)
 - `docker compose up --build` (from repo root) — db, redis, web on :8000
 - `pytest --cov=apps` — needs Postgres reachable via `DATABASE_URL`
 - `ruff check . && ruff format --check .` — CI runs both plus `makemigrations --check`
