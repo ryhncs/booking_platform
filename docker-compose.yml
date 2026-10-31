@@ -1,3 +1,21 @@
+x-backend: &backend
+  build:
+    context: ./backend
+    args:
+      INSTALL_DEV: "true"
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+  env_file: ./backend/.env.example
+  environment:
+    DATABASE_URL: postgres://booking:booking@db:5432/booking
+    REDIS_URL: redis://redis:6379
+  volumes:
+    - ./backend:/app
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
 services:
   db:
     image: postgres:16-alpine
@@ -14,28 +32,29 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 10
 
   web:
-    build:
-      context: ./backend
-      args:
-        INSTALL_DEV: "true"
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    <<: *backend
     command: >
       sh -c "python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
-    env_file: ./backend/.env.example
-    environment:
-      DATABASE_URL: postgres://booking:booking@db:5432/booking
-    volumes:
-      - ./backend:/app
     ports:
       - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_started
+
+  # Executes tasks (emails, reminders). Dev emails use the console backend, so
+  # they appear in this container's log: `docker compose logs -f worker`.
+  worker:
+    <<: *backend
+    command: celery -A config worker --loglevel=info
+
+  # Fires the periodic tasks in CELERY_BEAT_SCHEDULE (reminders, expiring holds).
+  beat:
+    <<: *backend
+    command: celery -A config beat --loglevel=info --schedule /tmp/celerybeat-schedule
 
 volumes:
   pgdata:

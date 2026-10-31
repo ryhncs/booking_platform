@@ -102,6 +102,22 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
 }
 
+# --- Redis / Celery ---------------------------------------------------------
+# One Redis, separate logical databases: 0 = Celery broker, 1 = cache.
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379")
+
+CELERY_BROKER_URL = f"{REDIS_URL}/0"
+CELERY_TASK_ACKS_LATE = True  # a task lost to a worker crash is redelivered
+CELERY_TASK_TIME_LIMIT = 60
+CELERY_TIMEZONE = "UTC"
+CELERY_BEAT_SCHEDULE = {}  # periodic tasks are registered next to the tasks themselves
+
+# --- Email -------------------------------------------------------------------
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", default="localhost")
+EMAIL_PORT = env.int("EMAIL_PORT", default=25)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Booking Platform <no-reply@example.com>")
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
