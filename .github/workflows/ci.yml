@@ -43,5 +43,4 @@ jobs:
       - run: ruff format --check .
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py spectacular --validate --fail-on-warn --file /dev/null
-      - run: python manage.py spectacular --validate --fail-on-warn --file /dev/null
       - run: pytest --cov=apps --cov-report=term-missing

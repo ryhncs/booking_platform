@@ -64,11 +64,28 @@ Interactive docs (Swagger UI) at `/api/docs/`, OpenAPI schema at `/api/schema/`.
 
 Booking errors are mapped in one place: a lost race for a slot is **409** (`slot_unavailable`); other rule violations (outside working hours, past start, expired hold) are **400** with a machine-readable `code`.
 
+## Caching and background work
+
+**Availability cache (Redis).** Free slots are cached per staff + service + date. Every key embeds a per-staff *version token*, so invalidating a staff member is a single write that orphans all their keys (any service, any date) without scanning. Model signals on bookings, shifts, time off, services (including who offers them), staff and the business timezone bump the token **on commit**: never before (a concurrent reader could re-cache old rows under the new version) and never on rollback. A 5-minute TTL bounds staleness if an invalidation is ever missed, and a Redis outage degrades to computing slots from PostgreSQL. The "not in the past" filter is applied on every read, so time passing can't make an entry stale. The tests fail if invalidation is disabled.
+
+**Celery + Beat.**
+
+| Task | Trigger | Notes |
+| --- | --- | --- |
+| `send_confirmation_email` | booking confirmed | queued with `transaction.on_commit` |
+| `send_cancellation_email` | booking cancelled | says who cancelled and why; goes to the party who did *not* cancel |
+| `send_due_reminders` → `send_reminder_email` | every 15 min | confirmed bookings starting within 24h |
+| `release_expired_holds` | every minute | cancels lapsed pending holds via `services.expire_booking`, which re-checks under a row lock so it can't cancel a booking confirmed meanwhile |
+
+Email tasks are idempotent: each *claims* its send with an atomic `UPDATE … WHERE <sent_at> IS NULL` (`confirmation_email_sent_at`, `cancellation_email_sent_at`, `reminder_sent_at`), so duplicate deliveries and concurrent workers send once; a failed send releases the claim and is retried with backoff.
+
 ## Running locally
 
 ```bash
 docker compose up --build
-# API on http://localhost:8000, admin on /admin
+# API on http://localhost:8000, Swagger on /api/docs/, admin on /admin
+# `worker` and `beat` run the Celery tasks; dev emails print in their log:
+#   docker compose logs -f worker
 docker compose exec web python manage.py createsuperuser
 ```
 
@@ -88,6 +105,6 @@ Django 5.2 · DRF · simplejwt · drf-spectacular · PostgreSQL 16 (`btree_gist`
 
 - [x] **Stage 1:** data model, overlap constraint, booking service, concurrency tests, Docker, CI
 - [x] **Stage 2:** REST API (JWT auth, role-based permissions, availability endpoint), OpenAPI docs via drf-spectacular
-- [ ] **Stage 3:** Redis caching of available slots with invalidation; Celery for confirmation emails, reminders and releasing expired holds
+- [x] **Stage 3:** Redis caching of available slots with invalidation; Celery for confirmation emails, reminders and releasing expired holds
 - [ ] **Stage 4:** React + Redux Toolkit frontend
 - [ ] **Stage 5:** deployment, architecture diagram, query-performance benchmarks
