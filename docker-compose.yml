@@ -20,6 +20,7 @@ services:
       context: ./backend
       args:
         INSTALL_DEV: "true"
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     command: >
       sh -c "python manage.py migrate &&
              python manage.py runserver 0.0.0.0:8000"
