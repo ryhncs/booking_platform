@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from apps.accounts.models import User
 from apps.businesses.models import Business, Service, Staff, WorkingHours
@@ -59,3 +60,20 @@ def service(business, staff):
     )
     svc.staff.add(staff)
     return svc
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
+
+
+@pytest.fixture
+def auth_client():
+    """Factory: an APIClient authenticated as the given user."""
+
+    def _make(user):
+        client = APIClient()
+        client.force_authenticate(user)
+        return client
+
+    return _make
