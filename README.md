@@ -4,7 +4,7 @@ A multi-business appointment booking backend (think a small Calendly or salon-bo
 
 The focus of the project is **correctness under concurrency**: two customers clicking "Book" on the same slot at the same millisecond must never both succeed.
 
-![CI](https://github.com/ryhncs/booking-platform/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/ryhncs/booking_platform/actions/workflows/ci.yml/badge.svg)
 
 ## Highlights
 
