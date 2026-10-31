@@ -7,6 +7,8 @@ from django.db.models import F, Q
 
 from apps.core.db import TsTzRange
 
+from .validators import validate_iana_timezone
+
 
 class Business(models.Model):
     owner = models.ForeignKey(
@@ -16,7 +18,7 @@ class Business(models.Model):
     slug = models.SlugField(unique=True)
     # IANA name, e.g. "Asia/Tehran". Working hours are interpreted in this zone;
     # every timestamp in the database is stored in UTC.
-    timezone = models.CharField(max_length=64, default="UTC")
+    timezone = models.CharField(max_length=64, default="UTC", validators=[validate_iana_timezone])
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,6 +1,16 @@
+from django import forms
 from django.contrib import admin
 
 from .models import Business, Service, Staff, TimeOff, WorkingHours
+from .validators import iana_timezones
+
+
+class BusinessAdminForm(forms.ModelForm):
+    timezone = forms.ChoiceField(choices=[(tz, tz) for tz in sorted(iana_timezones())])
+
+    class Meta:
+        model = Business
+        fields = ["owner", "name", "slug", "timezone"]
 
 
 class StaffInline(admin.TabularInline):
@@ -15,6 +25,7 @@ class WorkingHoursInline(admin.TabularInline):
 
 @admin.register(Business)
 class BusinessAdmin(admin.ModelAdmin):
+    form = BusinessAdminForm
     list_display = ("name", "owner", "timezone")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [StaffInline]
