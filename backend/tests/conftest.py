@@ -63,6 +63,21 @@ def service(business, staff):
 
 
 @pytest.fixture
+def other_owner(db):
+    return User.objects.create_user("owner2", "owner2@example.com", "pw", role=User.Role.OWNER)
+
+
+@pytest.fixture
+def other_business(other_owner):
+    return Business.objects.create(owner=other_owner, name="Barber", slug="barber")
+
+
+@pytest.fixture
+def other_staff(other_business):
+    return Staff.objects.create(business=other_business, display_name="Bob")
+
+
+@pytest.fixture
 def api_client():
     return APIClient()
 
