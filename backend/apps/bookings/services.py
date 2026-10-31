@@ -56,7 +56,9 @@ def _fits_working_hours(staff: Staff, start: datetime, end: datetime) -> bool:
     ).exists()
 
 
-def create_booking(*, customer, staff: Staff, service: Service, start: datetime) -> Booking:
+def create_booking(
+    *, customer, staff: Staff, service: Service, start: datetime, notes: str = ""
+) -> Booking:
     if timezone.is_naive(start):
         raise InvalidBookingRequest("start must include a timezone offset")
     if start <= timezone.now():
@@ -85,6 +87,7 @@ def create_booking(*, customer, staff: Staff, service: Service, start: datetime)
                 end=end,
                 status=Booking.Status.PENDING,
                 expires_at=timezone.now() + PENDING_HOLD,
+                notes=notes,
             )
     except IntegrityError as exc:
         if OVERLAP_CONSTRAINT in str(exc):
