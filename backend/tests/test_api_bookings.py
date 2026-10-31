@@ -178,10 +178,41 @@ class TestConfirm:
 
 
 class TestCancel:
-    def test_customer_cancels(self, client, booking):
-        resp = client.post(action("cancel", booking.pk))
+    def test_customer_cancels(self, client, customer, booking):
+        resp = client.post(action("cancel", booking.pk), {"reason": "Sick"}, format="json")
         assert resp.status_code == 200
         assert resp.data["status"] == "cancelled"
+        assert resp.data["cancelled_by"] == customer.pk
+        assert resp.data["cancellation_reason"] == "Sick"
+        booking.refresh_from_db()
+        assert booking.cancelled_by == customer
+        assert booking.cancellation_reason == "Sick"
+
+    def test_owner_cancel_records_the_owner_not_the_customer(self, owner, owner_client, booking):
+        resp = owner_client.post(
+            action("cancel", booking.pk), {"reason": "Staff out sick"}, format="json"
+        )
+        assert resp.status_code == 200
+        assert resp.data["cancelled_by"] == owner.pk
+        assert resp.data["cancelled_by"] != booking.customer_id
+        assert resp.data["cancellation_reason"] == "Staff out sick"
+
+    def test_reason_is_optional(self, client, customer, booking):
+        resp = client.post(action("cancel", booking.pk))
+        assert resp.status_code == 200
+        assert resp.data["cancellation_reason"] == ""
+        assert resp.data["cancelled_by"] == customer.pk
+
+    def test_overlong_reason_is_400(self, client, booking):
+        resp = client.post(action("cancel", booking.pk), {"reason": "x" * 1001}, format="json")
+        assert resp.status_code == 400
+        booking.refresh_from_db()
+        assert booking.status == Booking.Status.PENDING
+
+    def test_uncancelled_booking_has_no_cancellation_data(self, client, booking):
+        data = client.get(detail(booking.pk)).data
+        assert data["cancelled_by"] is None
+        assert data["cancellation_reason"] == ""
 
     def test_cancelling_a_confirmed_booking(self, client, booking):
         client.post(action("confirm", booking.pk))

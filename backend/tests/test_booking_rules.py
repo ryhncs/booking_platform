@@ -48,7 +48,7 @@ def test_cancelled_booking_frees_the_slot(customer, make_customer, staff, servic
     first = create_booking(
         customer=customer, staff=staff, service=service, start=next_monday_at(10)
     )
-    cancel_booking(first)
+    cancel_booking(first, cancelled_by=customer)
     again = create_booking(
         customer=make_customer(), staff=staff, service=service, start=next_monday_at(10)
     )

@@ -11,7 +11,8 @@ env = environ.Env(
 )
 environ.Env.read_env(BASE_DIR / ".env")
 
-SECRET_KEY = env("SECRET_KEY", default="insecure-dev-key-change-me")
+# 50+ chars (HMAC key length for JWT signing); production must override via env.
+SECRET_KEY = env("SECRET_KEY", default="insecure-dev-only-key-" + "x" * 40)
 DEBUG = env("DEBUG")
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 

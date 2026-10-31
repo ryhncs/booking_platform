@@ -21,6 +21,7 @@ from .serializers import (
     AvailabilitySerializer,
     BookingCreateSerializer,
     BookingSerializer,
+    CancelSerializer,
     ErrorSerializer,
 )
 
@@ -82,7 +83,7 @@ class AvailabilityView(APIView):
     ),
     cancel=extend_schema(
         summary="Cancel a pending or confirmed booking",
-        request=None,
+        request=CancelSerializer,
         responses={200: BookingSerializer, 400: ErrorSerializer},
     ),
 )
@@ -128,5 +129,9 @@ class BookingViewSet(
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        booking = services.cancel_booking(self.get_object())
+        data = CancelSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        booking = services.cancel_booking(
+            self.get_object(), cancelled_by=request.user, reason=data.validated_data["reason"]
+        )
         return Response(self.get_serializer(booking).data)

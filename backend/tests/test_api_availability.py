@@ -63,7 +63,7 @@ def test_cancelled_booking_frees_its_slots(client, customer, staff, service, mon
     booking = create_booking(
         customer=customer, staff=staff, service=service, start=next_monday_at(10)
     )
-    cancel_booking(booking)
+    cancel_booking(booking, cancelled_by=customer)
     assert "10:00" in starts(get(client, staff, service, monday))
 
 

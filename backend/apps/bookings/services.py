@@ -15,7 +15,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from django.db import IntegrityError, transaction
+import psycopg
+from django.db import IntegrityError, OperationalError, transaction
 from django.utils import timezone
 
 from apps.businesses.models import Service, Staff, TimeOff
@@ -24,6 +25,7 @@ from .models import Booking
 
 OVERLAP_CONSTRAINT = "booking_no_overlap_per_staff"
 PENDING_HOLD = timedelta(minutes=10)
+DEADLOCK_RETRIES = 3
 
 
 class BookingError(Exception):
@@ -75,24 +77,38 @@ def create_booking(
     if TimeOff.objects.filter(staff=staff, start__lt=end, end__gt=start).exists():
         raise SlotUnavailable("staff member is unavailable at that time")
 
-    try:
-        # Savepoint: if the constraint fires, only this insert is rolled back,
-        # leaving any surrounding transaction usable.
-        with transaction.atomic():
-            return Booking.objects.create(
-                customer=customer,
-                staff=staff,
-                service=service,
-                start=start,
-                end=end,
-                status=Booking.Status.PENDING,
-                expires_at=timezone.now() + PENDING_HOLD,
-                notes=notes,
-            )
-    except IntegrityError as exc:
-        if OVERLAP_CONSTRAINT in str(exc):
-            raise SlotUnavailable("this slot has just been taken") from exc
-        raise
+    # An exclusion constraint is checked against *uncommitted* rows too. When
+    # two transactions insert conflicting ranges at the same instant, each can
+    # find the other's pending tuple and wait for it to finish; PostgreSQL
+    # resolves that cycle by aborting one of them with a deadlock error
+    # (SQLSTATE 40P01) instead of the usual exclusion violation. Nothing was
+    # written, so the insert is safe to retry: the retry either wins the slot
+    # or now sees the committed rival row and fails cleanly with SlotUnavailable.
+    for attempt in range(1, DEADLOCK_RETRIES + 1):
+        try:
+            # Savepoint: if the insert fails, only it is rolled back, leaving
+            # any surrounding transaction usable.
+            with transaction.atomic():
+                return Booking.objects.create(
+                    customer=customer,
+                    staff=staff,
+                    service=service,
+                    start=start,
+                    end=end,
+                    status=Booking.Status.PENDING,
+                    expires_at=timezone.now() + PENDING_HOLD,
+                    notes=notes,
+                )
+        except IntegrityError as exc:
+            if OVERLAP_CONSTRAINT in str(exc):
+                raise SlotUnavailable("this slot has just been taken") from exc
+            raise
+        except OperationalError as exc:
+            if not isinstance(exc.__cause__, psycopg.errors.DeadlockDetected):
+                raise
+            if attempt == DEADLOCK_RETRIES:
+                raise SlotUnavailable("this slot is being contended; please retry") from exc
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def confirm_booking(booking: Booking) -> Booking:
@@ -108,12 +124,22 @@ def confirm_booking(booking: Booking) -> Booking:
     return booking
 
 
-def cancel_booking(booking: Booking) -> Booking:
+def cancel_booking(booking: Booking, *, cancelled_by, reason: str = "") -> Booking:
     with transaction.atomic():
         booking = Booking.objects.select_for_update().get(pk=booking.pk)
         if booking.status not in (Booking.Status.PENDING, Booking.Status.CONFIRMED):
             raise InvalidBookingRequest(f"cannot cancel a {booking.status} booking")
         booking.status = Booking.Status.CANCELLED
         booking.expires_at = None
-        booking.save(update_fields=["status", "expires_at", "updated_at"])
+        booking.cancelled_by = cancelled_by
+        booking.cancellation_reason = reason
+        booking.save(
+            update_fields=[
+                "status",
+                "expires_at",
+                "cancelled_by",
+                "cancellation_reason",
+                "updated_at",
+            ]
+        )
     return booking

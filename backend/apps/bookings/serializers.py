@@ -54,6 +54,10 @@ class BookingCreateSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
 
 
+class CancelSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
+
+
 class BookingSerializer(serializers.ModelSerializer):
     staff_name = serializers.CharField(source="staff.display_name", read_only=True)
     service_name = serializers.CharField(source="service.name", read_only=True)
@@ -72,6 +76,8 @@ class BookingSerializer(serializers.ModelSerializer):
             "status",
             "expires_at",
             "notes",
+            "cancelled_by",
+            "cancellation_reason",
             "created_at",
         ]
         read_only_fields = fields
