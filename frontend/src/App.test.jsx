@@ -3,7 +3,7 @@ import { expect, test } from 'vitest'
 
 import App from './App.jsx'
 
-test('renders the app title', () => {
+test('the real App boots and sends a logged-out visitor to the login page', async () => {
   render(<App />)
-  expect(screen.getByRole('heading', { name: 'Booking Platform' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
 })
