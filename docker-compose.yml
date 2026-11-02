@@ -56,5 +56,31 @@ services:
     <<: *backend
     command: celery -A config beat --loglevel=info --schedule /tmp/celerybeat-schedule
 
+  # Vite dev server for the React app: http://localhost:5173
+  frontend:
+    image: node:24-alpine
+    working_dir: /app
+    # Install exactly what package-lock.json says, but only when it changed
+    # since the last install (npm stamps node_modules/.package-lock.json).
+    command: >
+      sh -c "{ [ node_modules/.package-lock.json -nt package-lock.json ] || npm ci --no-audit --no-fund; } &&
+             npm run dev -- --host 0.0.0.0"
+    environment:
+      # Vite proxies /api to Django, so the browser only ever talks to :5173
+      # and Django needs no CORS settings.
+      VITE_API_PROXY_TARGET: http://web:8000
+      # File-change events don't cross a Windows bind mount; poll instead.
+      VITE_USE_POLLING: "true"
+    volumes:
+      - ./frontend:/app
+      # Keep node_modules inside Docker: Linux-native binaries, and much faster
+      # than a Windows bind mount.
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - web
+
 volumes:
   pgdata:
+  frontend_node_modules:
