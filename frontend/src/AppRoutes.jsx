@@ -8,6 +8,8 @@ import BusinessDetailPage from './features/businesses/BusinessDetailPage.jsx'
 import BusinessesPage from './features/businesses/BusinessesPage.jsx'
 import BookingPage from './features/bookings/BookingPage.jsx'
 import MyBookingsPage from './features/bookings/MyBookingsPage.jsx'
+import OwnerBusinessesPage from './features/owner/OwnerBusinessesPage.jsx'
+import OwnerBusinessPage from './features/owner/OwnerBusinessPage.jsx'
 
 /**
  * Every page of the app and the URL it lives at.
@@ -30,6 +32,12 @@ export default function AppRoutes() {
           <Route path="/businesses/:businessId" element={<BusinessDetailPage />} />
           <Route path="/businesses/:businessId/book" element={<BookingPage />} />
           <Route path="/bookings" element={<MyBookingsPage />} />
+
+          {/* Owner pages: a second ProtectedRoute layer adds the role check. */}
+          <Route element={<ProtectedRoute role="owner" />}>
+            <Route path="/owner/businesses" element={<OwnerBusinessesPage />} />
+            <Route path="/owner/businesses/:businessId" element={<OwnerBusinessPage />} />
+          </Route>
         </Route>
 
         <Route path="*" element={<NotFound />} />
