@@ -7,6 +7,7 @@ import RegisterPage from './features/auth/RegisterPage.jsx'
 import BusinessDetailPage from './features/businesses/BusinessDetailPage.jsx'
 import BusinessesPage from './features/businesses/BusinessesPage.jsx'
 import BookingPage from './features/bookings/BookingPage.jsx'
+import MyBookingsPage from './features/bookings/MyBookingsPage.jsx'
 
 /**
  * Every page of the app and the URL it lives at.
@@ -28,6 +29,7 @@ export default function AppRoutes() {
           <Route path="/businesses" element={<BusinessesPage />} />
           <Route path="/businesses/:businessId" element={<BusinessDetailPage />} />
           <Route path="/businesses/:businessId/book" element={<BookingPage />} />
+          <Route path="/bookings" element={<MyBookingsPage />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

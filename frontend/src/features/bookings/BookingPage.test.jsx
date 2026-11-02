@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, test } from 'vitest'
@@ -105,8 +105,12 @@ describe('booking flow', () => {
     await pickAndBook(user, '10:00')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('this slot was just taken')
-    const slots = await screen.findByRole('group', { name: 'Free times' })
-    expect(within(slots).queryByRole('button', { name: '10:00' })).not.toBeInTheDocument()
+    // The error renders as soon as the POST fails; the refetched slot list
+    // arrives a moment later, so wait for it rather than asserting at once.
+    const slots = screen.getByRole('group', { name: 'Free times' })
+    await waitFor(() =>
+      expect(within(slots).queryByRole('button', { name: '10:00' })).not.toBeInTheDocument(),
+    )
     expect(within(slots).getByRole('button', { name: '11:00' })).toBeInTheDocument()
     expect(calls.availability).toBe(2) // refetched because of the 409, not by hand
     // The stale choice is cleared, so it can't be submitted again.
