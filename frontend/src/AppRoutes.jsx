@@ -1,9 +1,11 @@
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 
 import Layout from './components/Layout.jsx'
 import LoginPage from './features/auth/LoginPage.jsx'
 import ProtectedRoute from './features/auth/ProtectedRoute.jsx'
 import RegisterPage from './features/auth/RegisterPage.jsx'
+import BusinessDetailPage from './features/businesses/BusinessDetailPage.jsx'
+import BusinessesPage from './features/businesses/BusinessesPage.jsx'
 
 /**
  * Every page of the app and the URL it lives at.
@@ -21,7 +23,9 @@ export default function AppRoutes() {
 
         {/* Everything below needs a signed-in user. */}
         <Route element={<ProtectedRoute />}>
-          <Route index element={<p>Welcome! Pages arrive in the next steps.</p>} />
+          <Route index element={<Navigate to="/businesses" replace />} />
+          <Route path="/businesses" element={<BusinessesPage />} />
+          <Route path="/businesses/:businessId" element={<BusinessDetailPage />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
