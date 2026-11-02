@@ -1,6 +1,6 @@
 # Booking Platform
 
-A multi-business appointment booking backend (think a small Calendly or salon-booking system) built with **Django, Django REST Framework and PostgreSQL**. Businesses define services, staff and weekly working hours; customers book open slots.
+A multi-business appointment booking platform (think a small Calendly or salon-booking system): a **Django, Django REST Framework and PostgreSQL** backend with a **React + Redux Toolkit** frontend. Businesses define services, staff and weekly working hours; customers book open slots.
 
 The focus of the project is **correctness under concurrency**: two customers clicking "Book" on the same slot at the same millisecond must never both succeed.
 
@@ -80,10 +80,24 @@ Booking errors are mapped in one place: a lost race for a slot is **409** (`slot
 
 Email tasks are idempotent: each *claims* its send with an atomic `UPDATE … WHERE <sent_at> IS NULL` (`confirmation_email_sent_at`, `cancellation_email_sent_at`, `reminder_sent_at`), so duplicate deliveries and concurrent workers send once; a failed send releases the claim and is retried with backoff. That same claim is what makes the sweep safe: re-queuing can never double-send.
 
+## Frontend
+
+`frontend/` is a React 19 single-page app (Vite, Redux Toolkit, RTK Query, React Router, plain CSS). Customers browse businesses, pick a service, staff member and date, see free slots **in the business's own timezone** and book. They then confirm or cancel from *My bookings*, where cancelled bookings show who cancelled and why. Owners create and edit their businesses, staff, weekly hours and services, and confirm or cancel incoming bookings.
+
+How it connects to the backend:
+
+- **One RTK Query API slice** with cache tags. Creating, confirming or cancelling a booking invalidates `Booking` and `Availability`, so lists and free slots refetch automatically. A **409 `slot_unavailable`** also invalidates `Availability`: the user sees "this slot was just taken" with the up-to-date free times, with no manual refetch.
+- **JWT with silent refresh.** A custom base query attaches the access token. On a 401 it refreshes once and retries; concurrent 401s share a single refresh. It logs out only if the refresh token itself is rejected.
+- **No CORS.** In development Vite proxies `/api` to Django, so the browser only ever talks to one origin.
+- **Tested with Vitest, React Testing Library and MSW**: the refresh flow, the 409 handling, route protection, and the booking and owner pages.
+
+[`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) walks through the folder structure, the data flow (component → RTK Query hook → apiSlice → Django), the auth/refresh sequence and how cache tags work. It is written for someone learning React.
+
 ## Running locally
 
 ```bash
 docker compose up --build
+# App on http://localhost:5173 (Vite, proxies /api to Django)
 # API on http://localhost:8000, Swagger on /api/docs/, admin on /admin
 # `worker` and `beat` run the Celery tasks; dev emails print in their log:
 #   docker compose logs -f worker
@@ -96,16 +110,20 @@ Run the tests (PostgreSQL is required; SQLite cannot express range exclusion con
 docker compose exec web pytest --cov=apps
 ```
 
-Or run everything CI runs (lint, format, migrations check, OpenAPI validation, tests) in a throwaway container with `./check.sh`.
+Or run everything CI runs in throwaway containers with `./check.sh`. For the backend that's lint, format, the migrations check, OpenAPI validation and pytest; for the frontend it's ESLint, Vitest and the Vite build.
 
 ## Tech stack
 
-Django 5.2 · DRF · simplejwt · drf-spectacular · PostgreSQL 16 (`btree_gist`, range types) · Redis · Docker Compose · pytest · GitHub Actions · Ruff
+**Backend:** Django 5.2 · DRF · simplejwt · drf-spectacular · PostgreSQL 16 (`btree_gist`, range types) · Redis · Celery · pytest · Ruff
+
+**Frontend:** React 19 · Vite · Redux Toolkit / RTK Query · React Router · Vitest · React Testing Library · MSW · ESLint
+
+**Tooling:** Docker Compose · GitHub Actions (separate backend and frontend jobs)
 
 ## Roadmap
 
 - [x] **Stage 1:** data model, overlap constraint, booking service, concurrency tests, Docker, CI
 - [x] **Stage 2:** REST API (JWT auth, role-based permissions, availability endpoint), OpenAPI docs via drf-spectacular
 - [x] **Stage 3:** Redis caching of available slots with invalidation; Celery for confirmation emails, reminders and releasing expired holds
-- [ ] **Stage 4:** React + Redux Toolkit frontend
+- [x] **Stage 4:** React + Redux Toolkit frontend (RTK Query, JWT refresh, booking flow, owner pages)
 - [ ] **Stage 5:** deployment, architecture diagram, query-performance benchmarks

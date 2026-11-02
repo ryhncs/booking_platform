@@ -9,9 +9,11 @@ Portfolio project: multi-business appointment booking backend (Django 5.2, DRF, 
 - `backend/apps/businesses` — Business (IANA timezone), Staff, Service, WorkingHours, TimeOff
 - `backend/apps/bookings` — Booking model + `services.py` (all booking writes go through it)
 - `backend/apps/bookings/{availability,signals}.py` — Redis-cached free slots + invalidation; `tasks.py`/`emails.py` — Celery tasks (worker/beat services in compose)
+- `frontend/` — React 19 + Vite + Redux Toolkit/RTK Query + React Router (plain JS, plain CSS). Read `frontend/ARCHITECTURE.md` first. One `api/apiSlice.js`; features inject endpoints (`features/*/…Api.js`); `api/baseQuery.js` does JWT refresh-and-retry; tests are Vitest + RTL + MSW next to the code
 - `backend/tests` — pytest (needs Postgres **and Redis**; cache/notification tests use real commits, `transaction=True`); `test_concurrency.py` races 20 threads for one slot
 
 ## Invariants — do not break
+- Frontend: all HTTP goes through RTK Query endpoints on the single `apiSlice` (no ad-hoc `fetch`). Mutations must invalidate the tags their change affects; anything that changes free slots invalidates `Availability`. Show times in the business's timezone (`utils/datetime.js`), never the browser's. The frontend comments explain the "why" for a React learner: keep that style.
 - No double booking is enforced by the `booking_no_overlap_per_staff` exclusion constraint (tstzrange, half-open `[start, end)`, cancelled excluded). Never replace it with a check-then-insert in Python.
 - All Booking writes go through `apps/bookings/services.py`; views/serializers call it and map `BookingError` subclasses to HTTP errors (`SlotUnavailable` → 409).
 - Timestamps stored in UTC; working hours are local to `Business.timezone`.
@@ -30,7 +32,7 @@ Before saying a change is done, run all of the above and make sure they pass. Ne
 PyPI is unreachable from the dev network; the repo-root `.env` sets `PIP_INDEX_URL` to a mirror. After changing requirements, rebuild with `docker compose up --build`.
 
 ## Commands (from `backend/`, inside the container)
-- `./check.sh` (from repo root) — all CI checks in Docker, incl. `spectacular --validate --fail-on-warn`
+- `./check.sh` (from repo root) — all CI checks in Docker: backend (incl. `spectacular --validate --fail-on-warn`) then frontend (`npm run check` = eslint + vitest + vite build in the `frontend` container)
 - `docker compose up --build` (from repo root) — db, redis, web on :8000
 - `pytest --cov=apps` — needs Postgres reachable via `DATABASE_URL`
 - `ruff check . && ruff format --check .` — CI runs both plus `makemigrations --check`
@@ -39,7 +41,7 @@ PyPI is unreachable from the dev network; the repo-root `.env` sets `PIP_INDEX_U
 - [x] Stage 1: models, constraint, service layer, tests, Docker, CI
 - [x] Stage 2: REST API — JWT (simplejwt), role-based permissions, business/staff/service CRUD for owners, availability endpoint (free slots for a staff+service+date), booking create/confirm/cancel, drf-spectacular Swagger at /api/docs/, API tests
 - [x] Stage 3: Redis cache for availability with invalidation on booking change; Celery + Beat: confirmation email, 24h reminder, release expired pending holds
-- [ ] Stage 4: `frontend/` React + Redux Toolkit (RTK Query)
+- [x] Stage 4: `frontend/` React + Redux Toolkit (RTK Query)
 - [ ] Stage 5: deploy, architecture diagram, query benchmarks in README
 
 Update the roadmap checkboxes and README when a stage is done.
