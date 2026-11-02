@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -69,7 +69,18 @@ class AvailabilityView(APIView):
 
 
 @extend_schema_view(
-    list=extend_schema(summary="List my bookings (or those at businesses I own)"),
+    list=extend_schema(
+        summary="List my bookings (or those at businesses I own)",
+        parameters=[
+            OpenApiParameter(
+                "scope",
+                enum=["mine", "business"],
+                description="mine: bookings I made; business: bookings at businesses I own. "
+                "Default: both.",
+            ),
+            OpenApiParameter("status", enum=["pending", "confirmed", "cancelled", "completed"]),
+        ],
+    ),
     retrieve=extend_schema(summary="Get one booking"),
     create=extend_schema(
         summary="Request a booking (starts as a 10-minute pending hold)",
@@ -106,8 +117,16 @@ class BookingViewSet(
         if getattr(self, "swagger_fake_view", False):  # schema generation, no user
             return Booking.objects.none()
         user = self.request.user
-        qs = Booking.objects.select_related("staff__business", "service").filter(
-            Q(customer=user) | Q(staff__business__owner=user)
+        visible = {
+            "mine": Q(customer=user),
+            "business": Q(staff__business__owner=user),
+            None: Q(customer=user) | Q(staff__business__owner=user),
+        }
+        scope = self.request.query_params.get("scope")
+        if scope not in visible:
+            raise ValidationError({"scope": "Must be 'mine' or 'business'."})
+        qs = Booking.objects.select_related("staff__business", "service", "customer").filter(
+            visible[scope]
         )
         wanted = self.request.query_params.get("status")
         if wanted:

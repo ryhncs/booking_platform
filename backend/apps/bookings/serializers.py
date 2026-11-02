@@ -61,12 +61,24 @@ class CancelSerializer(serializers.Serializer):
 class BookingSerializer(serializers.ModelSerializer):
     staff_name = serializers.CharField(source="staff.display_name", read_only=True)
     service_name = serializers.CharField(source="service.name", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    business = serializers.IntegerField(source="staff.business_id", read_only=True)
+    business_name = serializers.CharField(source="staff.business.name", read_only=True)
+    business_timezone = serializers.CharField(
+        source="staff.business.timezone",
+        read_only=True,
+        help_text="IANA zone; start/end are UTC, display them in this zone.",
+    )
 
     class Meta:
         model = Booking
         fields = [
             "id",
             "customer",
+            "customer_name",
+            "business",
+            "business_name",
+            "business_timezone",
             "staff",
             "staff_name",
             "service",
@@ -81,3 +93,6 @@ class BookingSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_customer_name(self, obj) -> str:
+        return obj.customer.get_full_name() or obj.customer.email

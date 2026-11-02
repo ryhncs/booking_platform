@@ -1,7 +1,12 @@
 from django.db.models import ProtectedError, Q
+from drf_spectacular.plumbing import build_array_type, build_basic_type
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import SAFE_METHODS
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.core.exceptions import Conflict
 
@@ -13,6 +18,7 @@ from .serializers import (
     StaffSerializer,
     WorkingHoursSerializer,
 )
+from .validators import iana_timezones
 
 
 class CatalogViewSet(viewsets.ModelViewSet):
@@ -91,3 +97,18 @@ class WorkingHoursViewSet(CatalogViewSet):
     serializer_class = WorkingHoursSerializer
     owner_lookup = "staff__business__owner"
     filter_params = {"staff": "staff_id"}
+
+
+class TimezoneListView(APIView):
+    """The exact set of names ``Business.timezone`` accepts.
+
+    Clients build their timezone picker from this rather than from the
+    browser's own list, which can differ from Python's tz database.
+    """
+
+    @extend_schema(
+        summary="Valid IANA timezone names for a business",
+        responses={200: build_array_type(build_basic_type(OpenApiTypes.STR))},
+    )
+    def get(self, request):
+        return Response(sorted(iana_timezones()))
