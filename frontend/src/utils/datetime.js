@@ -12,14 +12,18 @@ export function formatDateTime(iso, timeZone) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
   }).format(new Date(iso))
 }
 
+// 24-hour clock everywhere: appointment times read unambiguously ("14:30")
+// and look the same in every locale.
 export function formatTime(iso, timeZone) {
   return new Intl.DateTimeFormat(undefined, {
     timeZone,
     hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
   }).format(new Date(iso))
 }
 

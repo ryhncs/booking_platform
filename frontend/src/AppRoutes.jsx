@@ -6,6 +6,7 @@ import ProtectedRoute from './features/auth/ProtectedRoute.jsx'
 import RegisterPage from './features/auth/RegisterPage.jsx'
 import BusinessDetailPage from './features/businesses/BusinessDetailPage.jsx'
 import BusinessesPage from './features/businesses/BusinessesPage.jsx'
+import BookingPage from './features/bookings/BookingPage.jsx'
 
 /**
  * Every page of the app and the URL it lives at.
@@ -26,6 +27,7 @@ export default function AppRoutes() {
           <Route index element={<Navigate to="/businesses" replace />} />
           <Route path="/businesses" element={<BusinessesPage />} />
           <Route path="/businesses/:businessId" element={<BusinessDetailPage />} />
+          <Route path="/businesses/:businessId/book" element={<BookingPage />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
