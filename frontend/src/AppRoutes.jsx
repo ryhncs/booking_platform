@@ -10,6 +10,7 @@ import BookingPage from './features/bookings/BookingPage.jsx'
 import MyBookingsPage from './features/bookings/MyBookingsPage.jsx'
 import OwnerBusinessesPage from './features/owner/OwnerBusinessesPage.jsx'
 import OwnerBusinessPage from './features/owner/OwnerBusinessPage.jsx'
+import IncomingBookingsPage from './features/owner/IncomingBookingsPage.jsx'
 
 /**
  * Every page of the app and the URL it lives at.
@@ -37,6 +38,7 @@ export default function AppRoutes() {
           <Route element={<ProtectedRoute role="owner" />}>
             <Route path="/owner/businesses" element={<OwnerBusinessesPage />} />
             <Route path="/owner/businesses/:businessId" element={<OwnerBusinessPage />} />
+            <Route path="/owner/bookings" element={<IncomingBookingsPage />} />
           </Route>
         </Route>
 
