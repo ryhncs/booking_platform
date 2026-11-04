@@ -125,3 +125,8 @@ class TimeOff(models.Model):
 
     def __str__(self) -> str:
         return f"{self.staff} off {self.start:%Y-%m-%d %H:%M}–{self.end:%H:%M}"
+
+
+# Importable path for settings.SPECTACULAR_SETTINGS["ENUM_NAME_OVERRIDES"], which
+# names this choice set once even though several API fields use it.
+Weekday = WorkingHours.Weekday

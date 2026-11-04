@@ -59,6 +59,7 @@ Interactive docs (Swagger UI) at `/api/docs/`, OpenAPI schema at `/api/schema/`.
 | --- | --- | --- |
 | `POST /api/auth/register/`, `/login/`, `/refresh/`; `GET/PATCH /api/me/` | anyone / signed-in | self-registration as `customer` or `owner` only |
 | `/api/businesses/`, `/staff/`, `/services/`, `/working-hours/` | read: any signed-in user; write: owners | writes are scoped to the owner's own data (others' objects 404) |
+| `POST /api/working-hours/bulk/` | owners | the same hours on several weekdays (`{staff, weekdays, start_time, end_time}`), all-or-nothing; a 400 names the days that would overlap |
 | `GET /api/availability/?staff=&service=&date=` | signed-in | free slots in 15-minute steps, in the business's local time |
 | `POST /api/bookings/`, `GET /api/bookings/`, `POST /api/bookings/{id}/confirm/` and `/cancel/` | customer, or owner of the business | all writes go through `services.py` |
 

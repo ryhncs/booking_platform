@@ -162,4 +162,6 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    # `weekday` (one shift) and `weekdays` (bulk) share these choices: one enum name.
+    "ENUM_NAME_OVERRIDES": {"WeekdayEnum": "apps.businesses.models.Weekday"},
 }

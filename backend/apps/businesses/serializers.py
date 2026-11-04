@@ -1,3 +1,5 @@
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Business, Service, Staff, WorkingHours
@@ -10,6 +12,9 @@ class OwnedBusinessField(serializers.PrimaryKeyRelatedField):
         return Business.objects.filter(owner=self.context["request"].user)
 
 
+# Declared as an integer id for the OpenAPI schema: outside a ModelSerializer
+# (e.g. WorkingHoursBulkSerializer) drf-spectacular can't infer the pk type.
+@extend_schema_field(OpenApiTypes.INT)
 class OwnedStaffField(serializers.PrimaryKeyRelatedField):
     def get_queryset(self):
         return Staff.objects.filter(business__owner=self.context["request"].user)
@@ -91,4 +96,23 @@ class WorkingHoursSerializer(serializers.ModelSerializer):
             overlapping = overlapping.exclude(pk=current.pk)
         if overlapping.exists():
             raise serializers.ValidationError("Overlaps another shift on the same weekday.")
+        return attrs
+
+
+class WorkingHoursBulkSerializer(serializers.Serializer):
+    """Input for POST /working-hours/bulk/: one shift on several weekdays."""
+
+    staff = OwnedStaffField()
+    weekdays = serializers.ListField(
+        child=serializers.ChoiceField(choices=WorkingHours.Weekday.choices),
+        allow_empty=False,
+        max_length=7,
+        help_text="0 = Monday ... 6 = Sunday. Duplicates are ignored.",
+    )
+    start_time = serializers.TimeField()
+    end_time = serializers.TimeField()
+
+    def validate(self, attrs):
+        if attrs["end_time"] <= attrs["start_time"]:
+            raise serializers.ValidationError({"end_time": "Must be after start_time."})
         return attrs

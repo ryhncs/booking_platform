@@ -49,8 +49,10 @@ export const ownerApi = apiSlice.injectEndpoints({
       invalidatesTags: (_r, _e, id) => changed('Service', id),
     }),
 
-    createWorkingHours: build.mutation({
-      query: (body) => ({ url: '/working-hours/', method: 'POST', body }),
+    // One request for the same hours on several days: { staff, weekdays: [0..6],
+    // start_time, end_time }. The server saves all of them or none.
+    bulkCreateWorkingHours: build.mutation({
+      query: (body) => ({ url: '/working-hours/bulk/', method: 'POST', body }),
       invalidatesTags: [{ type: 'WorkingHours', id: 'LIST' }, 'Availability'],
     }),
     deleteWorkingHours: build.mutation({
@@ -69,6 +71,6 @@ export const {
   useCreateServiceMutation,
   useUpdateServiceMutation,
   useDeleteServiceMutation,
-  useCreateWorkingHoursMutation,
+  useBulkCreateWorkingHoursMutation,
   useDeleteWorkingHoursMutation,
 } = ownerApi

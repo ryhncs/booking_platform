@@ -369,6 +369,49 @@ fieldset {
   color: var(--danger);
 }
 
+/* ---- weekly hours editor ---- */
+.week-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.week-table th,
+.week-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.week-table th {
+  width: 7.5rem;
+  font-weight: 600;
+}
+
+.shift {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 8px 2px 0;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--bg);
+}
+
+.day-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.day-checks label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
 /* ---- booking flow ---- */
 .slots {
   display: grid;

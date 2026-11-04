@@ -1,8 +1,9 @@
 from django.db.models import ProtectedError, Q
 from drf_spectacular.plumbing import build_array_type, build_basic_type
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
-from rest_framework import viewsets
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
@@ -10,12 +11,14 @@ from rest_framework.views import APIView
 
 from apps.core.exceptions import Conflict
 
+from . import services
 from .models import Business, Service, Staff, WorkingHours
 from .permissions import IsOwnerOrReadOnly
 from .serializers import (
     BusinessSerializer,
     ServiceSerializer,
     StaffSerializer,
+    WorkingHoursBulkSerializer,
     WorkingHoursSerializer,
 )
 from .validators import iana_timezones
@@ -97,6 +100,28 @@ class WorkingHoursViewSet(CatalogViewSet):
     serializer_class = WorkingHoursSerializer
     owner_lookup = "staff__business__owner"
     filter_params = {"staff": "staff_id"}
+
+    @extend_schema(
+        summary="Add the same hours on several weekdays at once (all or nothing)",
+        request=WorkingHoursBulkSerializer,
+        responses={
+            201: WorkingHoursSerializer(many=True),
+            400: OpenApiResponse(description="Invalid input, or overlaps existing hours"),
+        },
+    )
+    @action(detail=False, methods=["post"], url_path="bulk")
+    def bulk(self, request):
+        # IsOwnerOrReadOnly already requires the owner role for POST; the
+        # OwnedStaffField rejects staff from another owner's business.
+        context = self.get_serializer_context()
+        data = WorkingHoursBulkSerializer(data=request.data, context=context)
+        data.is_valid(raise_exception=True)
+        try:
+            shifts = services.create_weekly_shifts(**data.validated_data)
+        except services.ShiftOverlap as exc:
+            raise ValidationError({"weekdays": [str(exc)]}) from None
+        body = WorkingHoursSerializer(shifts, many=True, context=context)
+        return Response(body.data, status=status.HTTP_201_CREATED)
 
 
 class TimezoneListView(APIView):

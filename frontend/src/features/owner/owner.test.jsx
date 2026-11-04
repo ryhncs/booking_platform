@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, test, vi } from 'vitest'
 
@@ -26,14 +26,22 @@ function backend(extra = []) {
     http.get(api('/staff/'), () => HttpResponse.json(page([{ id: 7, business: 1, display_name: 'Sara', is_active: true }]))),
     http.get(api('/services/'), () => HttpResponse.json(page([]))),
     http.get(api('/working-hours/'), () => HttpResponse.json(page(db.shifts))),
-    http.post(api('/working-hours/'), async ({ request }) => {
+    http.post(api('/working-hours/bulk/'), async ({ request }) => {
       db.shiftPosts += 1
       const body = await request.json()
-      if (db.shifts.some((s) => s.weekday === body.weekday)) {
-        return HttpResponse.json({ non_field_errors: ['Overlaps another shift on the same weekday.'] }, { status: 400 })
+      const clashing = body.weekdays.filter((day) => db.shifts.some((s) => s.weekday === day))
+      if (clashing.length) {
+        return HttpResponse.json({ weekdays: ['Overlaps existing hours on Monday. Nothing was added.'] }, { status: 400 })
       }
-      db.shifts.push({ id: db.shifts.length + 1, staff: 7, ...body, start_time: `${body.start_time}:00`, end_time: `${body.end_time}:00` })
-      return HttpResponse.json(db.shifts.at(-1), { status: 201 })
+      const created = body.weekdays.map((weekday, i) => ({
+        id: db.shifts.length + i + 1,
+        staff: 7,
+        weekday,
+        start_time: `${body.start_time}:00`,
+        end_time: `${body.end_time}:00`,
+      }))
+      db.shifts.push(...created)
+      return HttpResponse.json(created, { status: 201 })
     }),
   )
   return db
@@ -89,11 +97,14 @@ describe('owner: staff and hours', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Hours' }))
     const form = await screen.findByRole('form', { name: 'Add hours for Sara' })
+    await user.click(within(form).getByRole('checkbox', { name: 'Monday' }))
     await user.click(within(form).getByRole('button', { name: 'Add hours' }))
-    expect(await screen.findByText('Monday 09:00–17:00')).toBeInTheDocument()
+    const monday = () => screen.getByRole('rowheader', { name: 'Monday' }).closest('tr')
+    await waitFor(() => expect(monday()).toHaveTextContent('09:00–17:00'))
 
+    await user.click(within(form).getByRole('checkbox', { name: 'Monday' }))
     await user.click(within(form).getByRole('button', { name: 'Add hours' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Overlaps another shift')
+    expect(await screen.findByText(/Overlaps existing hours on Monday/)).toBeInTheDocument()
     expect(db.shiftPosts).toBe(2)
   })
 
