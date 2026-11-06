@@ -15,6 +15,7 @@ Portfolio project: multi-business appointment booking backend (Django 5.2, DRF, 
 ## Invariants — do not break
 - Frontend: all HTTP goes through RTK Query endpoints on the single `apiSlice` (no ad-hoc `fetch`). Mutations must invalidate the tags their change affects; anything that changes free slots invalidates `Availability`. Show times in the business's timezone (`utils/datetime.js`), never the browser's. The frontend comments explain the "why" for a React learner: keep that style.
 - No double booking is enforced by the `booking_no_overlap_per_staff` exclusion constraint (tstzrange, half-open `[start, end)`, cancelled excluded). Never replace it with a check-then-insert in Python.
+- No overlapping shifts is enforced by the `working_hours_no_overlap` exclusion constraint (staff =, weekday =, half-open `TimeRange(start_time, end_time)` from `apps/core/db.py`). Serializer checks only give friendlier messages; shift writes go through `businesses.services.save_shift` (maps the IntegrityError to `ShiftConflict`, retries deadlocks). Don't reintroduce Python locks or check-then-insert as the guarantee.
 - All Booking writes go through `apps/bookings/services.py`; views/serializers call it and map `BookingError` subclasses to HTTP errors (`SlotUnavailable` → 409).
 - Timestamps stored in UTC; working hours are local to `Business.timezone`.
 - PostgreSQL only (SQLite can't express the constraint).

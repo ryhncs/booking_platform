@@ -5,7 +5,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 
-from apps.core.db import TsTzRange
+from apps.core.db import TimeRange, TsTzRange
 
 from .validators import validate_iana_timezone
 
@@ -69,6 +69,11 @@ class Service(models.Model):
         return f"{self.name} ({self.duration_minutes} min)"
 
 
+# One wording for an overlapping shift, wherever it is caught: serializer
+# pre-check, the database constraint (via the API) or model validation (admin).
+SHIFT_OVERLAP_MESSAGE = "Overlaps another shift on the same weekday."
+
+
 class WorkingHours(models.Model):
     """A weekly recurring shift, in the business's local time."""
 
@@ -93,8 +98,19 @@ class WorkingHours(models.Model):
             models.CheckConstraint(
                 condition=Q(end_time__gt=F("start_time")), name="working_hours_end_after_start"
             ),
-            models.UniqueConstraint(
-                fields=["staff", "weekday", "start_time"], name="working_hours_unique_shift"
+            # Same idea as booking_no_overlap_per_staff: PostgreSQL itself
+            # refuses a second shift for the same person on the same weekday
+            # whose [start, end) overlaps an existing one. That covers every
+            # write path (single and bulk API, admin, shell) and concurrent
+            # requests. It also implies the old "unique start time" rule.
+            ExclusionConstraint(
+                name="working_hours_no_overlap",
+                expressions=[
+                    (TimeRange("start_time", "end_time"), RangeOperators.OVERLAPS),
+                    ("staff", RangeOperators.EQUAL),
+                    ("weekday", RangeOperators.EQUAL),
+                ],
+                violation_error_message=SHIFT_OVERLAP_MESSAGE,
             ),
         ]
 

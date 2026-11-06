@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from apps.core.exceptions import Conflict
 
 from . import services
-from .models import Business, Service, Staff, WorkingHours
+from .models import SHIFT_OVERLAP_MESSAGE, Business, Service, Staff, WorkingHours
 from .permissions import IsOwnerOrReadOnly
 from .serializers import (
     BusinessSerializer,
@@ -100,6 +100,21 @@ class WorkingHoursViewSet(CatalogViewSet):
     serializer_class = WorkingHoursSerializer
     owner_lookup = "staff__business__owner"
     filter_params = {"staff": "staff_id"}
+
+    # The serializer's overlap check gives a friendly answer up front, but two
+    # concurrent requests can both pass it; the exclusion constraint then
+    # rejects one of them. save_shift turns that into the same 400.
+    def perform_create(self, serializer):
+        self._save(serializer)
+
+    def perform_update(self, serializer):
+        self._save(serializer)
+
+    def _save(self, serializer):
+        try:
+            services.save_shift(serializer.save)
+        except services.ShiftConflict:
+            raise ValidationError({"non_field_errors": [SHIFT_OVERLAP_MESSAGE]}) from None
 
     @extend_schema(
         summary="Add the same hours on several weekdays at once (all or nothing)",

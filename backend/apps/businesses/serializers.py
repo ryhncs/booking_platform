@@ -2,7 +2,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from .models import Business, Service, Staff, WorkingHours
+from .models import SHIFT_OVERLAP_MESSAGE, Business, Service, Staff, WorkingHours
 
 
 class OwnedBusinessField(serializers.PrimaryKeyRelatedField):
@@ -95,7 +95,8 @@ class WorkingHoursSerializer(serializers.ModelSerializer):
         if current:
             overlapping = overlapping.exclude(pk=current.pk)
         if overlapping.exists():
-            raise serializers.ValidationError("Overlaps another shift on the same weekday.")
+            # A friendly early answer; the database constraint is the guarantee.
+            raise serializers.ValidationError(SHIFT_OVERLAP_MESSAGE)
         return attrs
 
 

@@ -32,6 +32,8 @@ This is stronger than the usual "check if the slot is free, then insert" approac
 
 **Half-open ranges make back-to-back slots work naturally:** a 10:00–11:00 booking does not conflict with 11:00–12:00.
 
+**Staff schedules get the same guarantee.** A second exclusion constraint, `working_hours_no_overlap` (`staff =`, `weekday =`, and a half-open range built from the shift's start and end times), means no write path can give someone overlapping shifts on the same weekday. That covers the single and bulk API, the admin and the shell. A 09:00–12:00 shift next to a 12:00–17:00 one is still allowed. The API turns a violation into the same friendly 400, and the bulk endpoint still names the clashing days. `tests/test_shift_concurrency.py` races 20 overlapping requests: with the constraint exactly 1 succeeds, and with it dropped several overlapping shifts got through, even though the serializer checks first. The migration that adds it first checks existing data, and stops with a list of any overlapping shifts instead of failing halfway.
+
 **Timezone-correct.** All timestamps are stored in UTC; working hours are interpreted in each business's own IANA timezone.
 
 **Rules live in one place.** All booking writes go through `apps/bookings/services.py`, which raises typed, client-actionable errors (`SlotUnavailable`, `OutsideWorkingHours`, `InvalidBookingRequest`) instead of leaking database errors.
