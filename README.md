@@ -124,6 +124,15 @@ docker compose up --build
 docker compose exec web python manage.py createsuperuser
 ```
 
+Load demo data (three businesses with Sat–Wed staff hours, services, and bookings in every state):
+
+```bash
+docker compose exec web python manage.py seed_demo
+# customer@demo.com / demo-pass-1234    owner@demo.com / demo-pass-1234
+```
+
+It is safe to re-run: the demo catalog is refreshed and the bookings at the demo businesses are replaced, so their dates stay relative to today. It only runs with `DEBUG` on, because the accounts use a published password.
+
 Run the tests (PostgreSQL is required; SQLite cannot express range exclusion constraints):
 
 ```bash
