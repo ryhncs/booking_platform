@@ -55,8 +55,11 @@ class TestDatabaseConstraint:
 
 
 @pytest.mark.django_db
-class TestAdminAndModelValidation:
-    """The admin validates through ModelForm -> Model.validate_constraints()."""
+class TestModelFormValidation:
+    """A standalone ModelForm reports the constraint through model validation.
+
+    Inline rows do not: see test_admin_working_hours.py.
+    """
 
     def test_model_form_reports_the_friendly_message(self, staff):
         Form = modelform_factory(WorkingHours, fields="__all__")

@@ -70,7 +70,7 @@ class Service(models.Model):
 
 
 # One wording for an overlapping shift, wherever it is caught: serializer
-# pre-check, the database constraint (via the API) or model validation (admin).
+# pre-check, the database constraint (via the API) or Model.full_clean().
 SHIFT_OVERLAP_MESSAGE = "Overlaps another shift on the same weekday."
 
 
