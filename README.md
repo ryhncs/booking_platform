@@ -55,6 +55,66 @@ This is stronger than the usual "check if the slot is free, then insert" approac
 
 **Rules live in one place.** All booking writes go through `apps/bookings/services.py`, which raises typed, client-actionable errors (`SlotUnavailable`, `OutsideWorkingHours`, `InvalidBookingRequest`) instead of leaking database errors.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    browser["React SPA<br/>Redux Toolkit, RTK Query"]
+    api["Django + DRF<br/>REST API, JWT"]
+    pg[("PostgreSQL 16<br/>exclusion constraints")]
+    worker["Celery worker"]
+    beat["Celery beat<br/>periodic sweeps"]
+    email["Email<br/>console backend in dev"]
+
+    subgraph redis["Redis"]
+        cache["db 1: availability cache"]
+        broker["db 0: Celery broker"]
+    end
+
+    browser -- "/api (Vite proxy in dev)" --> api
+    api -- "bookings and schedules" --> pg
+    api -- "read slots, new version on commit" --> cache
+    api -- "queue emails on commit" --> broker
+    beat -- "reminders, expired holds, lost emails" --> broker
+    broker --> worker
+    worker -- "claim sends, release holds" --> pg
+    worker -- "new version when a hold is released" --> cache
+    worker --> email
+```
+
+PostgreSQL is the source of truth and the only thing that can decide a double booking. Redis is safe to lose: without it, free slots are computed from PostgreSQL on every request.
+
+Booking a slot, including the path where someone else gets there first:
+
+```mermaid
+sequenceDiagram
+    actor C as Customer
+    participant UI as React (RTK Query)
+    participant API as Django / DRF
+    participant DB as PostgreSQL
+    participant R as Redis
+
+    C->>UI: Pick a free slot and click Book
+    UI->>API: POST /api/bookings/
+    API->>API: services.create_booking checks hours and time off
+    API->>DB: INSERT booking (pending, 10 minute hold)
+    alt Slot is still free
+        DB-->>API: Row created
+        API->>R: New cache version for this staff member (on commit)
+        API-->>UI: 201 Created
+        UI->>UI: Invalidate Booking and Availability tags
+        UI-->>C: Booked, confirm within 10 minutes
+    else Another booking got there first
+        DB-->>API: Exclusion constraint violated
+        API-->>UI: 409 slot_unavailable
+        UI-->>C: This slot was just taken
+        UI->>API: GET /api/availability/ (Availability tag invalidated)
+        API->>R: Read slots for the current version
+        API-->>UI: Free slots without the taken one
+        UI-->>C: Updated free times
+    end
+```
+
 ## Data model
 
 ```
