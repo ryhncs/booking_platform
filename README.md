@@ -6,6 +6,23 @@ The focus of the project is **correctness under concurrency**: two customers cli
 
 ![CI](https://github.com/ryhncs/booking_platform/actions/workflows/ci.yml/badge.svg)
 
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/2-booking-slots.png" alt="Booking page with free times"><br><sub>Free times for a staff member and service, shown in the business's own timezone.</sub></td>
+<td width="50%"><img src="docs/screenshots/3-slot-taken-409.png" alt="Slot just taken message"><br><sub>Someone else booked the slot first: the API returns 409 and the free times refresh by themselves.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/4-my-bookings.png" alt="My bookings"><br><sub>My bookings: confirm a pending hold, cancel with a reason, see who cancelled and why.</sub></td>
+<td><img src="docs/screenshots/1-businesses.png" alt="Businesses list"><br><sub>Customers browse businesses.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/5-owner-staff-hours.png" alt="Owner: staff and weekly hours"><br><sub>Owners manage staff, services and weekly hours (several days in one go; overlaps blocked by the database).</sub></td>
+<td><img src="docs/screenshots/6-owner-incoming.png" alt="Owner: incoming bookings"><br><sub>Owners confirm or cancel incoming bookings.</sub></td>
+</tr>
+</table>
+
 ## Highlights
 
 **Double-booking is impossible at the database level.** Each booking's time is modelled as a half-open PostgreSQL range `tstzrange(start, end)`, and an exclusion constraint backed by a GiST index forbids two active bookings for the same staff member whose ranges overlap:
