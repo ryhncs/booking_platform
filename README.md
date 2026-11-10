@@ -173,6 +173,19 @@ How it connects to the backend:
 
 [`frontend/ARCHITECTURE.md`](frontend/ARCHITECTURE.md) walks through the folder structure, the data flow (component → RTK Query hook → apiSlice → Django), the auth/refresh sequence and how cache tags work. It is written for someone learning React.
 
+## Benchmarks
+
+Measured on the demo data. [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) has the method, every run, and the commands to reproduce them.
+
+| What | Result |
+| --- | --- |
+| `GET /api/availability/`, p50 / p95 (1 gunicorn worker, 3 × 1,000 requests) | cold 32 / 40 ms, cached 21 / 26 ms; with persistent DB connections, cold 11 / 15 ms, cached 7 / 10 ms |
+| SQL statements per request (asserted in tests, so an N+1 fails CI) | lists 3–4, availability 7 cold / 4 cached, booking create 7, confirm/cancel 8, all flat as rows grow |
+| 20 concurrent requests for one slot | exactly 1 succeeds in 20 of 20 runs; with the constraint removed, 20 of 20 succeed |
+| 20 concurrent overlapping shifts | exactly 1 succeeds in 20 of 20 runs; with the constraint removed, 4–11 succeed |
+
+The cache saves about a third of the availability latency. A new PostgreSQL connection per request (Django's default) costs more than that, so persistent connections would be the first change for a deployment.
+
 ## Running locally
 
 ```bash

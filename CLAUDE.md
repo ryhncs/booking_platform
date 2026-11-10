@@ -35,6 +35,9 @@ PyPI is unreachable from the dev network; the repo-root `.env` sets `PIP_INDEX_U
 ## Commands (from `backend/`, inside the container)
 - `./check.sh` (from repo root) — all CI checks in Docker: backend (incl. `spectacular --validate --fail-on-warn`) then frontend (`npm run check` = eslint + vitest + vite build in the `frontend` container)
 - `docker compose up --build` (from repo root) — db, redis, web on :8000
+- `python manage.py seed_demo` — idempotent demo data; customer@demo.com / owner@demo.com, password `demo-pass-1234` (DEBUG only)
+- Query counts per endpoint are asserted exactly in `tests/test_query_counts.py`: if a change legitimately alters one, update the constant there and the table in `docs/BENCHMARKS.md`
+- Benchmarks: see `docs/BENCHMARKS.md` (`benchmark_availability` command; `RUN_CONSTRAINT_MUTATION=1` for the constraint-removed races)
 - `pytest --cov=apps` — needs Postgres reachable via `DATABASE_URL`
 - `ruff check . && ruff format --check .` — CI runs both plus `makemigrations --check`
 
