@@ -228,4 +228,4 @@ Or run everything CI runs in throwaway containers with `./check.sh`. For the bac
 - [x] **Stage 2:** REST API (JWT auth, role-based permissions, availability endpoint), OpenAPI docs via drf-spectacular
 - [x] **Stage 3:** Redis caching of available slots with invalidation; Celery for confirmation emails, reminders and releasing expired holds
 - [x] **Stage 4:** React + Redux Toolkit frontend (RTK Query, JWT refresh, booking flow, owner pages)
-- [ ] **Stage 5:** deployment, architecture diagram, query-performance benchmarks
+- [x] **Stage 5:** demo data (`seed_demo`), architecture diagrams, measured benchmarks with query counts asserted in CI. Deployment and production settings were left out on purpose.

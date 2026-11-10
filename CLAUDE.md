@@ -46,6 +46,6 @@ PyPI is unreachable from the dev network; the repo-root `.env` sets `PIP_INDEX_U
 - [x] Stage 2: REST API — JWT (simplejwt), role-based permissions, business/staff/service CRUD for owners, availability endpoint (free slots for a staff+service+date), booking create/confirm/cancel, drf-spectacular Swagger at /api/docs/, API tests
 - [x] Stage 3: Redis cache for availability with invalidation on booking change; Celery + Beat: confirmation email, 24h reminder, release expired pending holds
 - [x] Stage 4: `frontend/` React + Redux Toolkit (RTK Query)
-- [ ] Stage 5: deploy, architecture diagram, query benchmarks in README
+- [x] Stage 5 (reduced scope): `seed_demo`, Mermaid architecture + booking sequence in README, `docs/BENCHMARKS.md` (availability cold vs cached, query counts asserted in `tests/test_query_counts.py`, concurrency with and without the constraints). Deployment and production settings deliberately left out.
 
 Update the roadmap checkboxes and README when a stage is done.
